@@ -1,10 +1,22 @@
 # Changelog
 
-## (unreleased)
+## v6.2.0 (unreleased)
+
+### structurizr-core
+
+- Adds support for setting deployment groups on deployment nodes, which are inherited by software system instances and container instances when added.
+- Removes the default deployment group of "Default".
+- Fixes https://github.com/structurizr/structurizr/issues/64 (responses cannot be added if the request is not present in the view).
 
 ### structurizr-dsl
 
 - Throws an exception when an identifier is already in use, irrespective of whether the same element/relationship is being registered again.
+- Adds support for setting the deployment group on a deployment node (https://github.com/structurizr/structurizr/issues/62).
+
+### structurizr-export
+
+- Fixes https://github.com/structurizr/structurizr/issues/61 (support multiple groups having the same name when using PlantUML).
+- Adds support for software system/container boundaries on PlantUML sequence diagrams, configurable via a property named `plantuml.boundaries` (https://github.com/structurizr/structurizr/issues/63).
 
 ## v6.1.0 (6th March 2026)
 
