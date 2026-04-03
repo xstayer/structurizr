@@ -3,7 +3,7 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
     const self = this;
     const font = { name: structurizr.ui.DEFAULT_FONT_NAME };
     const gridSize = 5;
-    const nameFontSizeDifferenceRatio = 1.4;
+    const nameFontSizeDifferenceRatio = 1.3;
     const metadataFontSizeDifferenceRatio = 0.7;
 
     const darkenPercentage = -10;
@@ -21,7 +21,7 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
     var diagramWidth = 0;
     var diagramHeight = 0;
     var margin = 400;
-    var clusterPadding = 50;
+    var clusterPadding = 15;
     var scrollBarWidth = 0;
     var lineHeight = '1.2em';
     var diagramKey;
@@ -3866,6 +3866,17 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
                 const separator = getGroupSeparator();
                 nameText = name.substring(name.lastIndexOf(separator) + separator.length);
             }
+            if (elementStyle.width !== undefined && elementStyle.width > 0) {
+                // Keep explicit new lines out of the auto-wrap path for fixed-width groups.
+                var normalizedNameText = structurizr.util.removeNewlineCharacters(nameText);
+                var boundaryInternalMargin = 16; // 8px padding on each side
+                nameText = breakText(
+                    normalizedNameText,
+                    Math.max(0, elementStyle.width - boundaryInternalMargin),
+                    font.name,
+                    (elementStyle.fontSize * nameFontSizeDifferenceRatio)
+                );
+            } 
 
             // and apply opacity
             textColor = structurizr.util.shadeColor(textColor, 100 - elementStyle.opacity, darkMode);
@@ -3991,13 +4002,17 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
                     'font-family': font.name,
                     'font-weight': 'bold',
                     'font-size': (elementStyle.fontSize * nameFontSizeDifferenceRatio) + 'px',
-                    fill: textColor
+                    fill: textColor,
+                    'dominant-baseline': 'hanging',
+                    lineHeight: lineHeight
                 },
                 '.structurizrMetaData': {
                     text: metadata,
                     'font-family': font.name,
                     'font-size': (elementStyle.fontSize * metadataFontSizeDifferenceRatio) + 'px',
-                    fill: textColor
+                    fill: textColor,
+                    'dominant-baseline': 'hanging',
+                    lineHeight: lineHeight
                 }
             }
         });
@@ -4014,7 +4029,9 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
         boundary._computedStyle.fontSize = elementStyle.fontSize;
 
         var cellView = paper.findViewByModel(boundary);
-        const widthOfName = $('#' + cellView.id + ' .structurizrName')[0].getComputedTextLength();
+        const widthOfName = calculateWidth(nameText, elementStyle.fontSize * nameFontSizeDifferenceRatio);
+        const widthOfMetadata = calculateWidth(metadata, elementStyle.fontSize * metadataFontSizeDifferenceRatio);
+        const widthOfBoundaryLabel = Math.max(widthOfName, widthOfMetadata);
 
         if (icon) {
             var iconRatio = getImageRatio(icon);
@@ -4026,9 +4043,9 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
             boundary.attributes.attrs['.structurizrIcon']['opacity'] = (elementStyle.opacity/100);
             boundary._computedStyle.icon = icon;
 
-            boundary._computedStyle.minimumWidth = widthOfIcon + 10 + widthOfName;
+            boundary._computedStyle.minimumWidth = widthOfIcon + 10 + widthOfBoundaryLabel;
         } else {
-            boundary._computedStyle.minimumWidth = widthOfName;
+            boundary._computedStyle.minimumWidth = widthOfBoundaryLabel;
         }
 
         $('#' + cellView.id).attr('style', 'cursor: ' + (editable === true ? 'move' : 'default') + ' !important');
@@ -4218,12 +4235,12 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
     function reposition(parentCell) {
         if (parentCell && parentCell.getEmbeddedCells().length > 0) {
             const viewOrFilter = (currentFilter !== undefined ? currentFilter : currentView);
+            const nameText = parentCell.attr('.structurizrName').text;
             const metadataText = parentCell.attr('.structurizrMetaData').text;
-            const fontSize = parentCell._computedStyle.fontSize;
 
             var defaultInternalPadding = '20';
             var internalPadding = clusterPadding;
-            var margin = 15;
+            var margin = 8;
 
             // if (parentCell.elementInView === undefined) {
             //     internalPadding = parseInt(getViewOrViewSetProperty(viewOrFilter, 'structurizr.groupPadding', defaultInternalPadding));
@@ -4239,11 +4256,13 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
 
             var nameFontSize = parseInt(parentCell.attr('.structurizrName')['font-size']);
             var metadataFontSize = parseInt(parentCell.attr('.structurizrMetaData')['font-size']);
+            var nameHeight = calculateHeight(nameText, nameFontSize, 0);
+            var metadataHeight = calculateHeight(metadataText, metadataFontSize, 0);
 
             if (metadataText && metadataText.length > 0) {
-                padding.bottom = padding.bottom + nameFontSize + metadataFontSize + margin;
+                padding.bottom = padding.bottom + nameHeight + metadataHeight + margin;
             } else {
-                padding.bottom = padding.bottom + nameFontSize + margin;
+                padding.bottom = padding.bottom + nameHeight + margin;
             }
 
             var minX = Number.MAX_VALUE;
@@ -4297,14 +4316,16 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
             parentCell.resize(newWidth, newHeight);
 
             if (metadataText && metadataText.length > 0) {
+                const metadataY = newHeight - 15 - metadataHeight;
+                const nameY = metadataY - nameHeight;
                 parentCell.attr({
                     '.structurizrName': {
                         'ref-x': refX,
-                        'y': newHeight - (15 + fontSize)
+                        'y': nameY
                     },
                     '.structurizrMetaData': {
                         'ref-x': refX,
-                        'y': newHeight - 15
+                        'y': metadataY
                     },
                     '.structurizrInstanceCount': {
                         'ref-x': (newWidth - margin) / newWidth,
@@ -4312,10 +4333,11 @@ structurizr.ui.Diagram = function(id, diagramIsEditable, constructionCompleteCal
                     }
                 });
             } else {
+                const nameY = newHeight - 15 - nameHeight;
                 parentCell.attr({
                     '.structurizrName': {
                         'ref-x': refX,
-                        'y': newHeight - 15
+                        'y': nameY
                     },
                     '.structurizrMetaData': {
                         'ref-x': refX,
